@@ -1,9 +1,15 @@
 # Data Cleaning
 
+library(calibrate)
 library(tidyverse)
+library(stats)
+library(MASS)
+library(leaps)
+library(DAAG)
+library(olsrr)
+library(glmnet)
 
 # setwd("~/Desktop/UVA DSI/STAT 6021/NHL_WAR")
-# setwd("/home/yingjie/Desktop/NHL_WAR")
 
 # Read in files
 
@@ -109,10 +115,6 @@ fa_clean <- left_join(fa, merged17, by= c('PLAYER'='FullName'))
 names(fa_clean)[names(fa_clean) == 'Cap Hit'] <- 'LY Cap Hit'
 names(fa_clean)[names(fa_clean) == 'Salary'] <- 'LY Salary'
 
-
-# Impute missing draft data
-
-
 # aggregated performance for the past 3 years
 # Prev 3 - GPG APG PTSPG, TOIPG 
 
@@ -210,18 +212,91 @@ fa_clean <- fa_clean[!is.na(fa_clean$GP),]
 fa_clean$`1st`[is.na(fa_clean$`1st`)] <- 0
 fa_clean$`2nd`[is.na(fa_clean$`2nd`)] <- 0
 fa_clean$`3rd`[is.na(fa_clean$`3rd`)] <- 0
+fa_clean$stars <- fa_clean$`1st` + fa_clean$`2nd` + fa_clean$`3rd`
+fa_clean$`1st` <- NULL
+fa_clean$`2nd` <- NULL
+fa_clean$`3rd` <- NULL
 
 sum(is.na(fa_clean))
 colSums(is.na(fa_clean))
 
 fa_clean[is.na(fa_clean)] <- 0
 
+#clean names
+names(fa_clean)[names(fa_clean) == 'CAP HIT'] = 'cap_hit'
+names(fa_clean)[names(fa_clean) == 'LY Salary'] = 'ly_salary'
+names(fa_clean)[names(fa_clean) == 'LY Cap Hit'] = 'ly_cap_hit'
+names(fa_clean)[names(fa_clean) == 'pk_TOI/GP'] = 'pk_TOIGP'
+names(fa_clean)[names(fa_clean) == 'E+/-'] = 'Eplusminus'
+names(fa_clean)[names(fa_clean) == '+/-'] = 'plusminus'
+names(fa_clean)[names(fa_clean) == 'PLAYER'] = 'name'
+
+#remove other contract data
+fa_clean$VALUE = NULL
+fa_clean$DATE = NULL
+fa_clean$LENGTH = NULL
+
+#convert percentages
+percent_cols = names(fa_clean)[grepl('%', names(fa_clean)) == T]
+
+remove_special = function(x) gsub('[$%,]', '', x)
+fa_clean[, percent_cols] = apply(fa_clean[, percent_cols], 2, remove_special)
+fa_clean[, percent_cols] = apply(fa_clean[, percent_cols], 2, as.numeric)
+fa_clean[fa_clean$name == 'Barclay Goodrow','ev_IPP%'] <- 0
+
+#convert dollars
+fa_clean$cap_hit = lapply(fa_clean$cap_hit, remove_special)
+fa_clean$ly_cap_hit = lapply(fa_clean$ly_cap_hit, remove_special)
+fa_clean$ly_salary = lapply(fa_clean$ly_salary, remove_special)
+
+fa_clean$cap_hit = lapply(fa_clean$cap_hit, as.numeric)
+fa_clean$ly_cap_hit = lapply(fa_clean$ly_cap_hit, as.numeric)
+fa_clean$ly_salary = lapply(fa_clean$ly_salary, as.numeric)
+
+fa_clean$cap_hit = unlist(fa_clean$cap_hit)
+fa_clean$ly_cap_hit = unlist(fa_clean$ly_cap_hit)
+fa_clean$ly_salary = unlist(fa_clean$ly_salary)
+
+colSums(is.na(fa_clean))
+sapply(fa_clean, class)
+
+names <- c('name','POS','Nat')
+allnames <- names(fa_clean)
+num_names<- subset(allnames, !(allnames %in% names))
+
+fa_clean_char <- data.frame(fa_clean[names])
+
+fa_clean <- as.data.frame(apply(fa_clean[num_names], 2, as.numeric))
+fa_clean[is.na(fa_clean)] <- 0
+fa_clean <- cbind(fa_clean_char,fa_clean)
+
+
+# Separate out non-performance stats
+
+non_perf <- c('Pos','Nat','Ht','Wt','DftYr','DftRd','Ovrl','ly_salary','ly_cap_hit')
+
+fa_clean_full <- fa_clean
+fa_clean_perf <- fa_clean[, !(names(fa_clean) %in% non_perf)]
+
 # Separate D
-fa_clean_D <- fa_clean[fa_clean$POS == 'D',]
-fa_clean_F <- fa_clean[!fa_clean$POS == 'D',]
+full_d <- fa_clean_full[fa_clean_full$POS == 'D',]
+full_f <- fa_clean_full[!fa_clean_full$POS == 'D',]
 
-write.csv(fa_clean_D, file = "fa_clean_D.csv")
-write.csv(fa_clean_F, file = "fa_clean_F.csv")
+perf_d <- fa_clean_perf[fa_clean_perf$POS == 'D',]
+perf_f <- fa_clean_perf[!fa_clean_perf$POS == 'D',]
 
+#drop POS
+
+full_d$POS <- NULL
+full_f$POS <- NULL
+perf_d$POS <- NULL
+perf_f$POS <- NULL
+
+
+write.csv(full_d, file = "full_D.csv")
+write.csv(full_f, file = "full_F.csv")
+
+write.csv(perf_d, file = "perfonly_D.csv")
+write.csv(perf_f, file = "perfonly_F.csv")
 
 
