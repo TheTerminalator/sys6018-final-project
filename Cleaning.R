@@ -253,6 +253,9 @@ fa_clean$cap_hit = lapply(fa_clean$cap_hit, as.numeric)
 fa_clean$ly_cap_hit = lapply(fa_clean$ly_cap_hit, as.numeric)
 fa_clean$ly_salary = lapply(fa_clean$ly_salary, as.numeric)
 
+
+
+
 fa_clean$cap_hit = unlist(fa_clean$cap_hit)
 fa_clean$ly_cap_hit = unlist(fa_clean$ly_cap_hit)
 fa_clean$ly_salary = unlist(fa_clean$ly_salary)
@@ -273,7 +276,7 @@ fa_clean <- cbind(fa_clean_char,fa_clean)
 
 # Separate out non-performance stats
 
-non_perf <- c('Pos','Nat','Ht','Wt','DftYr','DftRd','Ovrl','ly_salary','ly_cap_hit')
+non_perf <- c('Pos','Nat', 'AGE','Ht','Wt','DftYr','DftRd','Ovrl','ly_salary','ly_cap_hit')
 
 fa_clean_full <- fa_clean
 fa_clean_perf <- fa_clean[, !(names(fa_clean) %in% non_perf)]

@@ -86,6 +86,20 @@ col_idx <- grep("cap_hit", names(full_F))
 full_F <- full_F[, c(col_idx, (1:ncol(full_F))[-col_idx])]
 names(full_F)
 
+#Looking at Nat
+plot(full_D$Nat)
+summary(full_D$Nat)
+#Class imbalance: large number of Canada and USA Nat's but not others, going to combine into
+#binary classificaiton. 1 for CanAndUSA and 0 for every other nationality.
+
+full_D$CA_US = ifelse(((full_D$Nat == 'CAN')|(full_D$Nat == 'USA')),1,0)
+full_D$CA_US<-as.factor(full_D$CA_US)
+full_D = full_D[,-3]
+
+full_F$CA_US = ifelse(((full_F$Nat == 'CAN')|(full_F$Nat == 'USA')),1,0)
+full_F$CA_US<-as.factor(full_F$CA_US)
+full_F = full_F[,-3]
+
 #------------------Performance Only Data Set
 #Need to idetify which are categorical variables and which are numeric
 lapply(perfonly_D, class)
@@ -107,24 +121,195 @@ col_idx <- grep("cap_hit", names(perfonly_F))
 perfonly_F <- perfonly_F[, c(col_idx, (1:ncol(perfonly_F))[-col_idx])]
 names(perfonly_F)
 
-
 #-------------------------------------------LINEAR MODELING------------------------------------------------
+#PRELIMINARY ANALYSIS
+lm0=lm(cap_hit~., data = full_D)
+summary(lm0) # HIGH r square but might largely due to multicollinearity
+vif(lm0) # severe multicollineary
 
 #-------------------------------------------ITERATIVE MODEL SELECTION------------------------------------------------
+#-----------------------------------------------Lasso Regression------------------------------------------------
 
-#-------------------------------------------this section is bullshit
+#Here, since we clearly have significant multicollinearity I am going to use Lasso regression (a method of variable selection)
+#to identify the most important variables and move forward with modeling from there.
 
+#------------------Full Data Set
+#-------DEFENSE
 ## Put data into a matrix for ridge regression
 sdata.m <- as.matrix(full_D)
-
-## Lasso regression
-###################
+class(sdata.m) <- "numeric"
+#sdata.m <- sdata.m[,-3]
+summary(sdata.m)
 
 ## Lasso regression uses the same function as ridge regression with alpha=1
-s.lasso <- glmnet(sdata.m[,2:88], sdata.m[,1], alpha=0)
+
+#fit_lasso = glmnet(df_mat[, -which(names(df) == 'cap_hit')], df_mat[, 2], alpha = 1)
+
+s.lasso <- glmnet(sdata.m[,-1], sdata.m[,1], alpha=1)
 s.lasso$lambda[20]
+s.lasso$lambda
 coef(s.lasso)[,20]
-#-------------------------------------------this section is bullshit
+#plot trace
+plot(s.lasso, xvar = "lambda", label = TRUE)
+
+which(coef(s.lasso)[,20] > 0)
+#Variables with coefficients > 0
+# AGE Ovrl xGF ly_salary ev_A1 ev_ixG ev_iSCF ev_iTKA pp_G pp_A1 pk_A stars
+
+#get variables selected by lasso so it can actually run
+good_vars = names(full_D)[which(coef(s.lasso)[,20] > 0)]
+good_vars = as.data.frame(good_vars)
+good_vars = good_vars[-1,]
+
+#cross validate
+lasso_cvm = cv.glmnet(sdata.m[, which(names(full_D) %in% good_vars)], sdata.m[, 1], alpha = 1)
+min_lambda = lasso_cvm$lambda.min
+
+#final lasso model
+lasso_cvm = glmnet(sdata.m[, which(names(full_D) %in% good_vars)], sdata.m[, 1], alpha = 1, lambda = min_lambda)
+lasso_cvm$lambda
+coef(lasso_cvm)[,1]
+lasso_cvm$dev.ratio
+#Significant variables in full_D dataset
+# [1] 0.742
+# (Intercept)         xGF   ly_salary       ev_A1      ev_ixG     ev_iSCF     ev_iTKA        pp_G 
+# 4.40e+05    1.05e+04    1.80e-01    1.81e+04    1.28e+05    1.25e+04    2.28e+04    1.68e+05 
+# pp_A1        pk_A       stars 
+# 5.10e+04    1.47e+05    1.07e+05
+
+#-------OFFENSE
+sdata.m <- as.matrix(full_F)
+class(sdata.m) <- "numeric"
+summary(sdata.m)
+s.lasso <- glmnet(sdata.m[,-1], sdata.m[,1], alpha=1)
+s.lasso$lambda[20]
+s.lasso$lambda
+coef(s.lasso)[,20]
+#plot trace
+plot(s.lasso, xvar = "lambda", label = TRUE)
+
+which(coef(s.lasso)[,20] > 0)
+#Variables with coefficients > 0
+# (Intercept)      ev_PTS     ev_iFOW        pp_A      pp_PTS       stars 
+#          1          23          45          54          56          87 
+
+#get variables selected by lasso so it can actually run
+good_vars = names(full_F)[which(coef(s.lasso)[,20] > 0)]
+good_vars = as.data.frame(good_vars)
+good_vars = good_vars[-1,]
+
+#cross validate
+lasso_cvm = cv.glmnet(sdata.m[, which(names(full_F) %in% good_vars)], sdata.m[, 1], alpha = 1)
+min_lambda = lasso_cvm$lambda.min
+
+#final lasso model
+lasso_cvm = glmnet(sdata.m[, which(names(full_F) %in% good_vars)], sdata.m[, 1], alpha = 1, lambda = min_lambda)
+lasso_cvm$lambda
+coef(lasso_cvm)[,1]
+
+#Significant variables in full_F dataset
+# (Intercept)      ev_PTS     ev_iFOW        pp_A      pp_PTS       stars 
+# 404795       16313        1615       98212       45844      196256
+
+#------------------Performance Only Data Set
+#-------DEFENSE
+sdata.m <- as.matrix(perfonly_D)
+class(sdata.m) <- "numeric"
+summary(sdata.m)
+s.lasso <- glmnet(sdata.m[,-1], sdata.m[,1], alpha=1)
+s.lasso$lambda[20]
+s.lasso$lambda
+coef(s.lasso)[,20]
+#plot trace
+plot(s.lasso, xvar = "lambda", label = TRUE)
+
+which(coef(s.lasso)[,20] > 0)
+#Variables with coefficients > 0
+# (Intercept)         xGF       ev_A1      ev_ixG     ev_iTKA        pp_G        pk_A ev_Prev3PTS 
+# 1           9          14          23          35          45          56          69 
+# stars 
+# 79 
+
+#get variables selected by lasso so it can actually run
+good_vars = names(perfonly_D)[which(coef(s.lasso)[,20] > 0)]
+good_vars = as.data.frame(good_vars)
+good_vars = good_vars[-1,]
+
+#cross validate
+lasso_cvm = cv.glmnet(sdata.m[, which(names(perfonly_D) %in% good_vars)], sdata.m[, 1], alpha = 1)
+min_lambda = lasso_cvm$lambda.min
+
+#final lasso model
+lasso_cvm = glmnet(sdata.m[, which(names(perfonly_D) %in% good_vars)], sdata.m[, 1], alpha = 1, lambda = min_lambda)
+lasso_cvm$lambda
+coef(lasso_cvm)[,1]
+
+#Significant variables in perfonly_D dataset
+# (Intercept)         xGF       ev_A1      ev_ixG     ev_iTKA        pp_G        pk_A ev_Prev3PTS 
+# 413032       11162       15872      169249       24389      313131      296767       10449 
+# stars 
+# 75906 
+
+#-------OFFENSE
+
+sdata.m <- as.matrix(perfonly_F)
+class(sdata.m) <- "numeric"
+summary(sdata.m)
+s.lasso <- glmnet(sdata.m[,-1], sdata.m[,1], alpha=1)
+s.lasso$lambda[20]
+s.lasso$lambda
+coef(s.lasso)[,20]
+#plot trace
+plot(s.lasso, xvar = "lambda", label = TRUE)
+
+which(coef(s.lasso)[,20] > 0)
+#Variables with coefficients > 0
+# (Intercept)      ev_PTS     ev_iFOW        pp_A      pp_PTS       stars 
+# 1          15          37          46          48          79 
+
+#get variables selected by lasso so it can actually run
+good_vars = names(perfonly_F)[which(coef(s.lasso)[,20] > 0)]
+good_vars = as.data.frame(good_vars)
+good_vars = good_vars[-1,]
+
+#cross validate
+lasso_cvm = cv.glmnet(sdata.m[, which(names(perfonly_F) %in% good_vars)], sdata.m[, 1], alpha = 1)
+min_lambda = lasso_cvm$lambda.min
+
+#final lasso model
+lasso_cvm = glmnet(sdata.m[, which(names(perfonly_F) %in% good_vars)], sdata.m[, 1], alpha = 1, lambda = min_lambda)
+lasso_cvm$lambda
+coef(lasso_cvm)[,1]
+
+#Significant variables in perfonly_F dataset
+# (Intercept)      ev_PTS     ev_iFOW        pp_A      pp_PTS       stars 
+# 404795       16313        1615       98212       45844      196256
+
+
+#CREATE BEST LINEAR MODELS FROM LASSO REGRESSION
+lasso_full_D <- lm(cap_hit~ xGF + ly_salary + ev_A1 + ev_ixG + ev_iSCF + ev_iTKA + pp_G, data= full_D)
+summary(lasso_full_D)
+vif(lasso_full_D)
+#Adjusted R-squared:  0.725
+
+lasso_full_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= full_F)
+summary(lasso_full_F)
+vif(lasso_full_F)
+#Adjusted R-squared:  0.844
+
+lasso_perfonly_D <- lm(cap_hit~ xGF + ev_A1 + ev_ixG + ev_iTKA + pp_G + pk_A + ev_Prev3PTS + stars, data= perfonly_D)
+summary(lasso_perfonly_D)
+vif(lasso_perfonly_D)
+#Adjusted R-squared:  0.719
+
+lasso_perfonly_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= perfonly_F)
+summary(lasso_perfonly_F)
+vif(lasso_perfonly_F)
+#Adjusted R-squared:  0.844
+
+#-----------------------------------------------End of Lasso Regression------------------------------------------------
+#-----------------------------------------------ITERATIVE MODEL SELECTION------------------------------------------------
+
 
 #----------------------------Full Defense Data Set
 ## Iterative model selection
@@ -134,59 +319,48 @@ model.full <- lm(cap_hit~., data=full_D)
 
 ## Forward selection
 step(model.null, scope=list(lower=model.null, upper=model.full), direction="forward")
-# Step:  AIC=2344.64
+# Step:  AIC=2386
 # cap_hit ~ xGF + pp_G + ev_iTKA + Ovrl + ly_salary + AGE + pp_Prev3PPG + 
 #   ev_Prev3G + ev_CF + ev_G + ev_ixG + ly_cap_hit + DftRd + 
-#   ev_iHA + pp_Pct. + OTG + ev_FF + Nat + ev_Prev3A + ev_Prev3Corsi + 
-#   pk_iBLK + ev_CA + Wt + ev_SCA + pp_A.60 + pp_Prev3PPA + pp_Prev3TOI + 
-#   ev_A.60 + ev_RelPct. + pp_TOI.GP + pk_Prev3TOI + ev_F.60 + 
-#   GP + ev_SH. + pk_A.60 + ev_SCF
+#   ev_iHA + pp_Pct. + OTG + ev_FF + GWG + stars + DftYr + ev_Prev3A + 
+#   CA_US + pk_Prev3Blk + pk_Prev3TOI + pk_RelPct.
 
 ## Backward selection
 step(model.full, scope=list(lower=model.null, upper=model.full), direction="backward")
-# Step:  AIC=2087.36
-# cap_hit ~ Nat + AGE + Ht + Wt + DftRd + Ovrl + GP + plusminus + 
-#   Eplusminus + PIM + OTG + GWG + NPD + xGF + xGA + ly_salary + 
-#   ly_cap_hit + ev_G + ev_A + ev_A1 + ev_IPP. + ev_SH. + ev_PDO + 
-#   ev_F.60 + ev_A.60 + ev_Pct. + ev_RelPct. + ev_iSCF + ev_iCF + 
-#   ev_iFF + ev_iSF + ev_iRB + ev_iRS + ev_Pass + ev_iHF + ev_iHA + 
-#   ev_iGVA + ev_iTKA + ev_iBLK + ev_iFOW + ev_FO. + ev_CF + 
-#   ev_CA + ev_FF + ev_FA + ev_SCA + pp_G + pp_A1 + pp_TOI + 
-#   pp_TOI.GP + pp_F.60 + pp_A.60 + pp_Pct. + pp_RelPct. + pk_G + 
-#   pk_A + pk_TOI + pk_TOIGP + pk_F.60 + pk_A.60 + pk_Pct. + 
-#   pk_RelPct. + pk_iTKA + pk_iBLK + Prev3GP + ev_Prev3G + ev_Prev3A + 
-#   ev_Prev3TOI + ev_Prev3Corsi + pp_Prev3PPG + pp_Prev3PPA + 
-#   pp_Prev3TOI + pk_Prev3Blk + pk_Prev3Hits + pk_Prev3TOI + 
-#   stars
+# Step:  AIC=2345
+# cap_hit ~ ly_cap_hit + Ht + Wt + DftYr + DftRd + Ovrl + GP + 
+#   plusminus + PIM + OTG + GWG + NPD + xGF + xGA + Grit + ly_salary + 
+#   ev_G + ev_A + ev_IPP. + ev_SH. + ev_PDO + ev_Pct. + ev_RelPct. + 
+#   ev_iSCF + ev_iCF + ev_iFF + ev_Pass + ev_iHF + ev_iHA + ev_iGVA + 
+#   ev_iTKA + ev_iFOW + ev_FO. + ev_CF + ev_CA + ev_FF + ev_FA + 
+#   ev_SCF + pp_G + pp_A1 + pp_TOI + pp_F.60 + pp_Pct. + pk_G + 
+#   pk_A + pk_TOI + pk_TOIGP + pk_A.60 + pk_Pct. + pk_RelPct. + 
+#   pk_iTKA + Prev3GP + ev_Prev3G + ev_Prev3A + ev_Prev3TOI + 
+#   pp_Prev3PPG + pp_Prev3PPA + pp_Prev3TOI + pk_Prev3Hits + 
+#   pk_Prev3TOI
 
 ## Stepwise selection
 step(model.null, scope=list(lower=model.null, upper=model.full), direction="both")
-# Step:  AIC=2339.99
-# cap_hit ~ xGF + ev_iTKA + Ovrl + ly_salary + AGE + pp_Prev3PPG + 
-#   ev_Prev3G + ev_CF + ev_G + ev_ixG + ly_cap_hit + DftRd + 
-#   ev_iHA + OTG + ev_FF + Nat + ev_Prev3A + ev_Prev3Corsi + 
-#   pk_iBLK + ev_CA + Wt + ev_SCA + pp_Prev3PPA + pp_Prev3TOI + 
-#   ev_A.60 + ev_RelPct. + ev_A + ev_F.60 + PIM + pk_A.60 + pk_RelPct. + 
-#   ev_A1 + pp_RelPct.
+# Step:  AIC=2384
+# cap_hit ~ xGF + ev_iTKA + Ovrl + ly_salary + pp_Prev3PPG + ev_Prev3G + 
+#   ev_CF + ev_G + ev_ixG + ly_cap_hit + DftRd + ev_iHA + pp_Pct. + 
+#   OTG + ev_FF + GWG + stars + DftYr + ev_Prev3A + CA_US + pk_Prev3Blk + 
+#   pk_Prev3TOI
 
 #Stepmodel with stepwise selection
-step_fulld <- lm(cap_hit ~ xGF + ev_iTKA + Ovrl + ly_salary + AGE + pp_Prev3PPG + 
-                           ev_Prev3G + ev_CF + ev_G + ev_ixG + ly_cap_hit + DftRd + 
-                           ev_iHA + OTG + ev_FF + Nat + ev_Prev3A + ev_Prev3Corsi + 
-                           pk_iBLK + ev_CA + Wt + ev_SCA + pp_Prev3PPA + pp_Prev3TOI + 
-                           ev_A.60 + ev_RelPct. + ev_A + ev_F.60 + PIM + pk_A.60 + pk_RelPct. + 
-                           ev_A1 + pp_RelPct., data=full_D)
+step_fulld <- lm(cap_hit ~ xGF + ev_iTKA + Ovrl + ly_salary + pp_Prev3PPG + ev_Prev3G + 
+                   ev_CF + ev_G + ev_ixG + ly_cap_hit + DftRd + ev_iHA + pp_Pct. + 
+                   OTG + ev_FF + GWG + stars + DftYr + ev_Prev3A + CA_US + pk_Prev3Blk + 
+                   pk_Prev3TOI, data=full_D)
 
 # Take a look at the model statistics and if there is any multicollinearity present that we need to be worried about.
 summary(step_fulld)
 vif(step_fulld)
-
-
+which(vif(step_fulld) < 10)
 #Remove multicollinear variables
-step_fulld1 <- lm(cap_hit ~ ev_iTKA + ly_salary + AGE + pp_Prev3PPG + 
-                   ev_Prev3G + ev_G + ev_iHA + OTG + Nat + ev_Prev3A + ev_Prev3Corsi + 
-                   pk_iBLK + Wt + ev_A.60 + ev_RelPct. + ev_A + ev_F.60 + PIM + pk_A.60 + 
-                   pk_RelPct. + ev_A1 + pp_RelPct., data=full_D)
+step_fulld1 <- lm(cap_hit ~ ev_iTKA + pp_Prev3PPG + ev_Prev3G + ev_G + 
+                    ev_iHA + pp_Pct. + OTG + GWG + stars + DftYr + ev_Prev3A + 
+                    CA_US, data=full_D)
 summary(step_fulld1)
 vif(step_fulld1)
 #no longer multicollinearity in the model
@@ -199,46 +373,46 @@ model.full <- lm(cap_hit~., data=full_F)
 
 ## Forward selection
 step(model.null, scope=list(lower=model.null, upper=model.full), direction="forward")
-# Step:  AIC=5039.34
+# Step:  AIC=5043
 # cap_hit ~ stars + pp_A + ev_iFOW + AGE + ly_salary + plusminus + 
 #   ly_cap_hit + pp_G + pp_TOI.GP + ev_iTKA + GP + ev_iFF + Grit + 
-#   Nat + ev_Prev3A + ev_G + pk_A + pk_iBLK + pp_Prev3PPA + pp_Prev3TOI + 
-#   ev_Pct. + pk_F.60 + Eplusminus + pp_A1 + pp_TOI + ev_CA + 
-#   ev_FF + pk_Prev3TOI + Ht + ev_iCF + xGA
+#   Prev3GP + ev_PTS + ev_Prev3TOI + pp_A1 + pk_RelPct. + ev_CA + 
+#   ev_FA + ev_CF + Eplusminus + pk_A + pk_G + ev_Prev3A + ev_iRB + 
+#   ev_SCA + xGF + ev_iHF + ev_iSF
 
 ## Backward selection
 step(model.full, scope=list(lower=model.null, upper=model.full), direction="backward")
-# Step:  AIC=5029.68
-# cap_hit ~ ly_cap_hit + Nat + AGE + GP + Eplusminus + xGF + ly_salary + 
-#   ev_A1 + ev_PDO + ev_F.60 + ev_A.60 + ev_RelPct. + ev_ixG + 
-#   ev_iCF + ev_Pass + ev_iHF + ev_iTKA + ev_iFOW + ev_CF + ev_CA + 
-#   ev_SCA + pp_G + pp_A + pp_A1 + pp_A.60 + pk_F.60 + Prev3GP + 
-#   ev_Prev3G + ev_Prev3A + ev_Prev3TOI + pp_Prev3PPA + pp_Prev3TOI + 
-#   pk_Prev3TOI + stars
+# Step:  AIC=5041
+# cap_hit ~ ly_cap_hit + AGE + GP + Eplusminus + PIM + xGF + xGA + 
+#   Grit + ly_salary + ev_A1 + ev_SH. + ev_F.60 + ev_A.60 + ev_RelPct. + 
+#   ev_iCF + ev_iSF + ev_Pass + ev_iHF + ev_iTKA + ev_iBLK + 
+#   ev_iFOW + ev_CF + ev_CA + ev_FA + ev_SCA + pp_G + pp_A + 
+#   pp_A1 + pp_A.60 + pk_A + pk_F.60 + Prev3GP + ev_Prev3A + 
+#   ev_Prev3TOI + pp_Prev3PPG + pp_Prev3PPA + pp_Prev3TOI + pk_Prev3TOI + 
+#   stars
 
 ## Stepwise selection
 step(model.null, scope=list(lower=model.null, upper=model.full), direction="both")
-# Step:  AIC=5034.65
+# Step:  AIC=5043
 # cap_hit ~ stars + pp_A + ev_iFOW + AGE + ly_salary + ly_cap_hit + 
-#   pp_G + ev_iTKA + GP + ev_iFF + Grit + Nat + ev_Prev3A + ev_G + 
-#   pk_A + pp_Prev3PPA + pp_Prev3TOI + pk_F.60 + Eplusminus + 
-#   pp_A1 + pp_TOI + ev_CA + ev_FF + pk_Prev3TOI + Ht
+#   pp_G + pp_TOI.GP + ev_iTKA + GP + ev_iFF + Grit + Prev3GP + 
+#   ev_PTS + ev_Prev3TOI + pp_A1 + pk_RelPct. + ev_CA + ev_FA + 
+#   ev_CF + Eplusminus + pk_A + pk_G
 
 #Stepmodel with stepwise selection
 step_fullf <- lm(cap_hit ~ stars + pp_A + ev_iFOW + AGE + ly_salary + ly_cap_hit + 
-                   pp_G + ev_iTKA + GP + ev_iFF + Grit + Nat + ev_Prev3A + ev_G + 
-                   pk_A + pp_Prev3PPA + pp_Prev3TOI + pk_F.60 + Eplusminus + 
-                   pp_A1 + pp_TOI + ev_CA + ev_FF + pk_Prev3TOI + Ht, data=full_F)
+                   pp_G + pp_TOI.GP + ev_iTKA + GP + ev_iFF + Grit + Prev3GP + 
+                   ev_PTS + ev_Prev3TOI + pp_A1 + pk_RelPct. + ev_CA + ev_FA + 
+                   ev_CF + Eplusminus + pk_A + pk_G, data=full_F)
 
 # Take a look at the model statistics and if there is any multicollinearity present that we need to be worried about.
 summary(step_fullf)
 vif(step_fullf)
+which(vif(step_fullf) < 10)
 
 #Remove multicollinear variables
-step_fullf1 <- lm(cap_hit ~ stars + ev_iFOW + AGE + ly_cap_hit + 
-                   pp_G + ev_iTKA + GP + Grit + Nat + ev_Prev3A + ev_G + 
-                   pk_A + pk_F.60 + Eplusminus + 
-                   pp_A1 + pk_Prev3TOI + Ht, data=full_F)
+step_fullf1 <- lm(cap_hit ~ ev_iFOW + AGE + pp_G + pp_TOI.GP + 
+                    ev_iTKA + Grit + pp_A1 + pk_RelPct. + Eplusminus + pk_A + pk_G, data=full_F)
 summary(step_fullf1)
 vif(step_fullf1)
 #no longer multicollinearity in the model
@@ -287,11 +461,12 @@ step_perfonlyd <- lm(cap_hit ~ pp_G + ev_iTKA + pk_Prev3TOI + pp_Prev3PPG + NPD 
 # Take a look at the model statistics and if there is any multicollinearity present that we need to be worried about.
 summary(step_perfonlyd)
 vif(step_perfonlyd)
+which(vif(step_perfonlyd) < 10)
 
 #Remove multicollinear variables
 step_perfonlyd1 <- lm(cap_hit ~ pp_G + ev_iTKA + pk_Prev3TOI + pp_Prev3PPG + NPD + 
                        ev_iDS + ev_G + ev_Prev3Corsi + pp_Prev3PPA + pp_A1 + 
-                       Grit + OTG + ev_SCA, data=perfonly_D)
+                       Grit + OTG, data=perfonly_D)
 summary(step_perfonlyd1)
 vif(step_perfonlyd1)
 #no longer multicollinearity in the model
@@ -336,12 +511,12 @@ step_perfonlyf <- lm(cap_hit ~ stars + pp_A + ev_iFOW + Eplusminus + pk_RelPct. 
 # Take a look at the model statistics and if there is any multicollinearity present that we need to be worried about.
 summary(step_perfonlyf)
 vif(step_perfonlyf)
+which(vif(step_perfonlyf) < 10)
 
 #Remove multicollinear variables
-step_perfonlyf1 <- lm(cap_hit ~ stars + pp_A + ev_iFOW + Eplusminus + pk_RelPct. + 
-                       pp_G + ev_iHF + ev_iTKA + pp_A1 + 
-                       ev_iSCF + pp_Prev3PPA + ev_iRB + pk_A + 
-                       pk_TOI, data=perfonly_F)
+step_perfonlyf1 <- lm(cap_hit ~ ev_iFOW + Eplusminus + pk_RelPct. + pp_G + ev_iHF + 
+                        ev_iTKA + pp_A1 + pp_Prev3PPA + ev_iRB + 
+                        pk_A + pk_TOI, data=perfonly_F)
 summary(step_perfonlyf1)
 vif(step_perfonlyf1)
 #no longer multicollinearity in the model
@@ -352,19 +527,19 @@ vif(step_perfonlyf1)
 #Now lets test our hypothesis and see which model performs better
 
 summary(step_fulld1)
-# Adjusted R^2 = 0.8104
+# Adjusted R-squared:  0.788
 # p-value: < 2.2e-16
 
 summary(step_fullf1)
-# Adjusted R-squared:  0.9016
+# Adjusted R-squared:  0.789
 # p-value: < 2.2e-16
 
 summary(step_perfonlyd1)
-# Adjusted R-squared:  0.7832 
+# Adjusted R-squared:  0.782
 # p-value: < 2.2e-16
 
 summary(step_perfonlyf1)
-# Adjusted R-squared:  0.8595
+# Adjusted R-squared:  0.784
 # p-value: < 2.2e-16
 
 anova(step_fulld1, step_perfonlyd1)
@@ -414,7 +589,7 @@ qqline(ti)
 
 
 #Using comparative model selection on the dataset with no multicollinearity
-bestmod <- regsubsets(cap_hit~., data=full_Dnm, nbest=10)
+bestmod <- regsubsets(cap_hit~., data=full_D, nbest=10)
 
 ## The 10 best models for each number of explanatory variables in the model
 summary(bestmod)
@@ -442,6 +617,20 @@ best.sum[order(best.sum$bic),]
 # K-fold cross-validation
 library(boot) #necessary library for logistic regression models
 
+#CROSS VALIDATION ON LASSO MODELS----------------------
+#K = 5 in K-fold cross-validation 
+cv.lm(data = full_D, lasso_full_D, m=5)
+
+#K = 5 in K-fold cross-validation 
+cv.lm(data = full_F, lasso_full_F, m=5)
+
+#K = 5 in K-fold cross-validation 
+cv.lm(data = perfonly_D, lasso_perfonly_D, m=5)
+
+#K = 5 in K-fold cross-validation 
+cv.lm(data = perfonly_F, lasso_perfonly_F, m=5)
+
+#CROSS VALIDATION ON STEPWISE MODELS-------------------
 #K = 5 in K-fold cross-validation 
 cv.lm(data = full_D, step_fulld1, m=5)
 
@@ -453,4 +642,65 @@ cv.lm(data = perfonly_D, step_perfonlyd1, m=5)
 
 #K = 5 in K-fold cross-validation 
 cv.lm(data = perfonly_F, step_perfonlyf1, m=5)
+
+#------------------------------------------Comparing Models Section 2----------------------------------------------
+
+# compare models
+#Lasso models created and copied from above
+lasso_full_D <- lm(cap_hit~ xGF + ly_salary + ev_A1 + ev_ixG + ev_iSCF + ev_iTKA + pp_G, data= full_D)
+
+lasso_full_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= full_F)
+
+lasso_perfonly_D <- lm(cap_hit~ xGF + ev_A1 + ev_ixG + ev_iTKA + pp_G + pk_A + ev_Prev3PTS + stars, data= perfonly_D)
+
+lasso_perfonly_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= perfonly_F)
+
+#Stepwise models created and copied from above
+step_fulld1 <- lm(cap_hit ~ ev_iTKA + pp_Prev3PPG + ev_Prev3G + ev_G + 
+                    ev_iHA + pp_Pct. + OTG + GWG + stars + DftYr + ev_Prev3A + 
+                    CA_US, data=full_D)
+
+step_fullf1 <- lm(cap_hit ~ ev_iFOW + AGE + pp_G + pp_TOI.GP + 
+                    ev_iTKA + Grit + pp_A1 + pk_RelPct. + Eplusminus + pk_A + pk_G, data=full_F)
+
+step_perfonlyd1 <- lm(cap_hit ~ pp_G + ev_iTKA + pk_Prev3TOI + pp_Prev3PPG + NPD + 
+                        ev_iDS + ev_G + ev_Prev3Corsi + pp_Prev3PPA + pp_A1 + 
+                        Grit + OTG, data=perfonly_D)
+
+step_perfonlyf1 <- lm(cap_hit ~ ev_iFOW + Eplusminus + pk_RelPct. + pp_G + ev_iHF + 
+                        ev_iTKA + pp_A1 + pp_Prev3PPA + ev_iRB + 
+                        pk_A + pk_TOI, data=perfonly_F)
+
+anova(lasso_full_D, step_fulld1) #step_fulld1 is better
+anova(lasso_full_F, step_fullf1) #lasso_full_F is better
+anova(lasso_perfonly_D, step_perfonlyd1) #step_perfonlyd1 is better
+anova(lasso_perfonly_F, step_perfonlyf1) #lasso_perfonly_F is better
+
+#So, when we compare the models created above, it is clear that the stepmodels are better suited for
+#the defense datasets, while the lasso models are better for the performance datasets
+
+summary(step_fulld1)
+summary(step_perfonlyd1)
+summary(lasso_full_F)
+summary(lasso_perfonly_F)
+
+#The chosen models for comparison are as follows (all p-values are significant at the 0.05 level)
+# Best full defense model: step_fulld1
+#       Adjusted R-squared:  0.788
+#       Most significant variables: ev_iTKA, ev_Prev3G, ev_iHA, stars, DftYr, ev_Prev3A, CA_US1
+# Best performance only defense model: step_perfonlyd1
+#       Adjusted R-squared:  0.782
+#       Most significant variables: pp_G, ev_iTKA, pk_Prev3TOI, pp_Prev3PPG, NPD, ev_iDS, 
+#                                   ev_Prev3Corsi, pp_A1, Grit
+# 
+# Best full offense model: lasso_full_F
+#      Adjusted R-squared:  0.844
+#      Most significant variables: ev_iFOW, pp_A, stars
+# best performance only offense model: lasso_perfonly_F
+#      Adjusted R-squared:  0.844
+#      Most significant variables: ev_iFOW, pp_A, stars
+
+
+#*Most significant variables are the ones with lowest p-value, largest coefficient, and smallest
+#std error
 
