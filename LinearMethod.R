@@ -280,6 +280,7 @@ min_lambda = lasso_cvm$lambda.min
 lasso_cvm = glmnet(sdata.m[, which(names(perfonly_F) %in% good_vars)], sdata.m[, 1], alpha = 1, lambda = min_lambda)
 lasso_cvm$lambda
 coef(lasso_cvm)[,1]
+summary(lasso_cvm)
 
 #Significant variables in perfonly_F dataset
 # (Intercept)      ev_PTS     ev_iFOW        pp_A      pp_PTS       stars 
@@ -619,29 +620,49 @@ library(boot) #necessary library for logistic regression models
 
 #CROSS VALIDATION ON LASSO MODELS----------------------
 #K = 5 in K-fold cross-validation 
-cv.lm(data = full_D, lasso_full_D, m=5)
+error <- cv.lm(data = full_D, lasso_full_D, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 644558
 
 #K = 5 in K-fold cross-validation 
-cv.lm(data = full_F, lasso_full_F, m=5)
+error <- cv.lm(data = full_F, lasso_full_F, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 603837
 
 #K = 5 in K-fold cross-validation 
-cv.lm(data = perfonly_D, lasso_perfonly_D, m=5)
+error <- cv.lm(data = perfonly_D, lasso_perfonly_D, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 673349
 
 #K = 5 in K-fold cross-validation 
-cv.lm(data = perfonly_F, lasso_perfonly_F, m=5)
+error <- cv.lm(data = perfonly_F, lasso_perfonly_F, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 603837
 
 #CROSS VALIDATION ON STEPWISE MODELS-------------------
 #K = 5 in K-fold cross-validation 
-cv.lm(data = full_D, step_fulld1, m=5)
+error <- cv.lm(data = full_D, step_fulld1, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 744523
 
 #K = 5 in K-fold cross-validation 
-cv.lm(data = full_F, step_fullf1, m=5)
+error <- cv.lm(data = full_F, step_fullf1, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 679883
 
 #K = 5 in K-fold cross-validation 
-cv.lm(data = perfonly_D, step_perfonlyd1, m=5)
+error <- cv.lm(data = perfonly_D, step_perfonlyd1, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Mean Absolute Error = 757496
 
 #K = 5 in K-fold cross-validation 
-cv.lm(data = perfonly_F, step_perfonlyf1, m=5)
+error <- cv.lm(data = perfonly_F, step_perfonlyf1, m=5)
+mean(abs(error$cvpred - error$cap_hit))
+#Testing MAE - observations that the model was not trained on
+#Mean Absolute Error = 690240
+
+#After analyizing all of the above MAE's, it is clear that the Lasso models perform better
+#on held out data (CV) than do the step models.
 
 #------------------------------------------Comparing Models Section 2----------------------------------------------
 
@@ -671,27 +692,29 @@ step_perfonlyf1 <- lm(cap_hit ~ ev_iFOW + Eplusminus + pk_RelPct. + pp_G + ev_iH
                         ev_iTKA + pp_A1 + pp_Prev3PPA + ev_iRB + 
                         pk_A + pk_TOI, data=perfonly_F)
 
-anova(lasso_full_D, step_fulld1) #step_fulld1 is better
+anova(lasso_full_D, step_fulld1) #lasso_full_D is better
 anova(lasso_full_F, step_fullf1) #lasso_full_F is better
-anova(lasso_perfonly_D, step_perfonlyd1) #step_perfonlyd1 is better
+anova(lasso_perfonly_D, step_perfonlyd1) #lasso_perfonly_D is better
 anova(lasso_perfonly_F, step_perfonlyf1) #lasso_perfonly_F is better
 
-#So, when we compare the models created above, it is clear that the stepmodels are better suited for
-#the defense datasets, while the lasso models are better for the performance datasets
+#Anova tables confirm that lasso models perform better than do step models
 
-summary(step_fulld1)
-summary(step_perfonlyd1)
+#So, as uncovered above by the Mean Absolute Errors, all of the Lasso regression models
+#perform better than the step models. Only using the lasso models to identify importance
+#of each predictor
+
+summary(lasso_full_D)
+summary(lasso_perfonly_D)
 summary(lasso_full_F)
 summary(lasso_perfonly_F)
 
 #The chosen models for comparison are as follows (all p-values are significant at the 0.05 level)
-# Best full defense model: step_fulld1
-#       Adjusted R-squared:  0.788
-#       Most significant variables: ev_iTKA, ev_Prev3G, ev_iHA, stars, DftYr, ev_Prev3A, CA_US1
-# Best performance only defense model: step_perfonlyd1
-#       Adjusted R-squared:  0.782
-#       Most significant variables: pp_G, ev_iTKA, pk_Prev3TOI, pp_Prev3PPG, NPD, ev_iDS, 
-#                                   ev_Prev3Corsi, pp_A1, Grit
+# Best full defense model: lasso_full_D
+#       Adjusted R-squared:  0.725
+#       Most significant variables: ly_salary, ev_iTKA, pp_G, xGF
+# Best performance only defense model: lasso_perfonly_D
+#       Adjusted R-squared:  0.719
+#       Most significant variables: ev_iTKA, pp_G, ev_Prev3PTS
 # 
 # Best full offense model: lasso_full_F
 #      Adjusted R-squared:  0.844
