@@ -114,7 +114,6 @@ names(perfonly_F)
 
 #-------------------------------------------this section is bullshit
 
-library(glmnet)
 ## Put data into a matrix for ridge regression
 sdata.m <- as.matrix(full_D)
 
