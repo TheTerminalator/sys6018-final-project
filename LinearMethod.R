@@ -19,7 +19,7 @@ setwd("~/Documents/UVA/UVA DS /SYS 6018 Data Mining/NHL_Salary")
 #NOTE: Data cleaning and exploration have been thoroughly done in a separate R file.
 #The data in the csv's below have already been cleaned and explored.
 
-
+#Loading in packages
 library(car)
 library(MASS)
 
