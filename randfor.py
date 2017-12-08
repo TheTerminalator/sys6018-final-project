@@ -30,16 +30,21 @@ perfRF = ensemble.RandomForestRegressor()
 
 #Create dictionary of parameters to be cross validated 
 #200 and 4 are the best
-parameters = {'n_estimators':[50,100,200,300], 'max_features':[4,7,15,20,30]}
+parameters = {'n_estimators':[25,50,100,200,300,500], 'max_features':[4,7,15,20,25,30,40,55,65,75]}
 
 print("Full")
 #Create Grid search object to cross validate
-clf = GridSearchCV(fullRF,parameters, scoring = "neg_mean_squared_error")
+clf = GridSearchCV(fullRF,parameters, scoring = "neg_mean_absolute_error")
 clf.fit(full.loc[:, full.columns != "cap_hit"], full["cap_hit"])
 print(clf.cv_results_)
+print(clf.best_estimator_ )
 #Predict probabilities and save them to csv
 
 print("Perf")
-clf = GridSearchCV(perfRF,parameters, scoring = "neg_mean_squared_error")
+clf = GridSearchCV(perfRF,parameters, scoring = "neg_mean_absolute_error")
 clf.fit(perf.loc[:, perf.columns != "cap_hit"], perf["cap_hit"])
 print(clf.cv_results_)
+print(clf.best_estimator_ )
+
+
+
