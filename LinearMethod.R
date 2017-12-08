@@ -589,7 +589,7 @@ qqline(ti)
 
 
 #Using comparative model selection on the dataset with no multicollinearity
-bestmod <- regsubsets(cap_hit~., data=full_Dnm, nbest=10)
+bestmod <- regsubsets(cap_hit~., data=full_D, nbest=10)
 
 ## The 10 best models for each number of explanatory variables in the model
 summary(bestmod)
@@ -642,3 +642,65 @@ cv.lm(data = perfonly_D, step_perfonlyd1, m=5)
 
 #K = 5 in K-fold cross-validation 
 cv.lm(data = perfonly_F, step_perfonlyf1, m=5)
+
+#------------------------------------------Comparing Models Section 2----------------------------------------------
+
+# compare models
+#Lasso models created and copied from above
+lasso_full_D <- lm(cap_hit~ xGF + ly_salary + ev_A1 + ev_ixG + ev_iSCF + ev_iTKA + pp_G, data= full_D)
+
+lasso_full_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= full_F)
+
+lasso_perfonly_D <- lm(cap_hit~ xGF + ev_A1 + ev_ixG + ev_iTKA + pp_G + pk_A + ev_Prev3PTS + stars, data= perfonly_D)
+
+lasso_perfonly_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= perfonly_F)
+
+#Stepwise models created and copied from above
+step_fulld1 <- lm(cap_hit ~ ev_iTKA + pp_Prev3PPG + ev_Prev3G + ev_G + 
+                    ev_iHA + pp_Pct. + OTG + GWG + stars + DftYr + ev_Prev3A + 
+                    CA_US, data=full_D)
+
+step_fullf1 <- lm(cap_hit ~ ev_iFOW + AGE + pp_G + pp_TOI.GP + 
+                    ev_iTKA + Grit + pp_A1 + pk_RelPct. + Eplusminus + pk_A + pk_G, data=full_F)
+
+step_perfonlyd1 <- lm(cap_hit ~ pp_G + ev_iTKA + pk_Prev3TOI + pp_Prev3PPG + NPD + 
+                        ev_iDS + ev_G + ev_Prev3Corsi + pp_Prev3PPA + pp_A1 + 
+                        Grit + OTG, data=perfonly_D)
+
+step_perfonlyf1 <- lm(cap_hit ~ ev_iFOW + Eplusminus + pk_RelPct. + pp_G + ev_iHF + 
+                        ev_iTKA + pp_A1 + pp_Prev3PPA + ev_iRB + 
+                        pk_A + pk_TOI, data=perfonly_F)
+
+anova(lasso_full_D, step_fulld1) #step_fulld1 is better
+anova(lasso_full_F, step_fullf1) #lasso_full_F is better
+anova(lasso_perfonly_D, step_perfonlyd1) #step_perfonlyd1 is better
+anova(lasso_perfonly_F, step_perfonlyf1) #lasso_perfonly_F is better
+
+#So, when we compare the models created above, it is clear that the stepmodels are better suited for
+#the defense datasets, while the lasso models are better for the performance datasets
+
+summary(step_fulld1)
+summary(step_perfonlyd1)
+summary(lasso_full_F)
+summary(lasso_perfonly_F)
+
+#The chosen models for comparison are as follows (all p-values are significant at the 0.05 level)
+# Best full defense model: step_fulld1
+#       Adjusted R-squared:  0.788
+#       Most significant variables: ev_iTKA, ev_Prev3G, ev_iHA, stars, DftYr, ev_Prev3A, CA_US1
+# Best performance only defense model: step_perfonlyd1
+#       Adjusted R-squared:  0.782
+#       Most significant variables: pp_G, ev_iTKA, pk_Prev3TOI, pp_Prev3PPG, NPD, ev_iDS, 
+#                                   ev_Prev3Corsi, pp_A1, Grit
+# 
+# Best full offense model: lasso_full_F
+#      Adjusted R-squared:  0.844
+#      Most significant variables: ev_iFOW, pp_A, stars
+# best performance only offense model: lasso_perfonly_F
+#      Adjusted R-squared:  0.844
+#      Most significant variables: ev_iFOW, pp_A, stars
+
+
+#*Most significant variables are the ones with lowest p-value, largest coefficient, and smallest
+#std error
+
