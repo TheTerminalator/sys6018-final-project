@@ -116,14 +116,23 @@ names(perfonly_F)
 
 ## Put data into a matrix for ridge regression
 sdata.m <- as.matrix(full_D)
+class(sdata.m) <- "numeric"
+sdata.m <- sdata.m[,-3]
+
 
 ## Lasso regression
 ###################
 
 ## Lasso regression uses the same function as ridge regression with alpha=1
-s.lasso <- glmnet(sdata.m[,2:88], sdata.m[,1], alpha=0)
+
+fit_lasso = glmnet(df_mat[, -which(names(df) == 'cap_hit')], df_mat[, 2], alpha = 1)
+
+s.lasso <- glmnet(sdata.m[,-1], sdata.m[,1], alpha=1)
 s.lasso$lambda[20]
 coef(s.lasso)[,20]
+
+
+
 #-------------------------------------------this section is bullshit
 
 #----------------------------Full Defense Data Set
