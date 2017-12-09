@@ -12,7 +12,6 @@ library(glmnet)
 # setwd("~/Desktop/UVA DSI/STAT 6021/NHL_WAR")
 
 # Read in files
-
 main14 <- read_csv('NHL 2013-14_main.csv')
 ev14 <- read_csv('NHL 2013-14_ev.csv')
 pp14 <- read_csv('NHL 2013-14_pp.csv')
@@ -85,7 +84,7 @@ pp17_cl <- pp17[ , (names(pp17) %in% pp17_names)]
 pk17_cl <- pk17[ , (names(pk17) %in% pk17_names)]
 ev17_cl <- ev17[ , (names(ev17) %in% ev17_names)]
 
-
+# Combine names
 name_concat <- function(df){
   df$FullName <- paste(df$`First Name`,df$`Last Name`, sep=' ')
   drops <- c('First Name','Last Name')
@@ -136,6 +135,8 @@ pp14_c <- pp14[,c('First Name','Last Name','PPG','PPA','PPP','PPTOI')]
 pk14_c <- pk14[,c('First Name','Last Name','SHBlk','SHHitF','SHTOI')]
 ev14_c <- ev14[,c('First Name','Last Name','ESG','ESA','ESP','Corsi','ESTOI')]
 
+
+# Clean variable names and merge Prev3 together
 main16_c <- name_concat(main16_c)
 pp16_c <- name_concat(pp16_c)
 pk16_c <- name_concat(pk16_c)
@@ -164,6 +165,7 @@ prev_main <- merge(main16_c, main15_c, by = "FullName", all = TRUE)
 prev_main <- merge(prev_main, main14_c, by = "FullName", all = TRUE)
 prev_main[is.na(prev_main)] <- 0
 
+# Calculate aggregated statistics
 prev_main$totgp <- prev_main$GP.x + prev_main$GP.y + prev_main$GP
 
 prev_ev <- merge(ev16_c, ev15_c, by = "FullName", all = TRUE)
@@ -254,8 +256,6 @@ fa_clean$ly_cap_hit = lapply(fa_clean$ly_cap_hit, as.numeric)
 fa_clean$ly_salary = lapply(fa_clean$ly_salary, as.numeric)
 
 
-
-
 fa_clean$cap_hit = unlist(fa_clean$cap_hit)
 fa_clean$ly_cap_hit = unlist(fa_clean$ly_cap_hit)
 fa_clean$ly_salary = unlist(fa_clean$ly_salary)
@@ -273,7 +273,6 @@ fa_clean <- as.data.frame(apply(fa_clean[num_names], 2, as.numeric))
 fa_clean[is.na(fa_clean)] <- 0
 fa_clean <- cbind(fa_clean_char,fa_clean)
 
-
 # Separate out non-performance stats
 
 non_perf <- c('Pos','Nat', 'AGE','Ht','Wt','DftYr','DftRd','Ovrl','ly_salary','ly_cap_hit')
@@ -289,7 +288,6 @@ perf_d <- fa_clean_perf[fa_clean_perf$POS == 'D',]
 perf_f <- fa_clean_perf[!fa_clean_perf$POS == 'D',]
 
 #drop POS
-
 full_d$POS <- NULL
 full_f$POS <- NULL
 perf_d$POS <- NULL
