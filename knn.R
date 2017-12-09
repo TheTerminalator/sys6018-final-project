@@ -2,7 +2,7 @@
 # setwd("~/Desktop/UVA DSI/SYS6018/NHL_Salary")
 
 library(tidyverse)
-# library(FNN)
+library(FNN)
 library(rknn)
 library(DMwR)
 library(caret)
@@ -38,14 +38,14 @@ beg1_r2 <- 0
 beg1_var <- list()
 beg1_pred <- list()
 for (i in 1:100){
-  beg1 <- rknnBeg(full_F, fullF_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(full_F))), stopat = 5)
+  beg1 <- rknnBeg(full_F, fullF_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(full_F))), stopat = 2)
   beg1_m <- knn.reg(train = full_F[, bestset(beg1)], y = fullF_hit, k = 5)
   beg1_var[[i]] <- bestset(beg1)
   beg1_r2[i] <- beg1_m$R2Pred
   beg1_pred[[i]] <- beg1_m$pred
 }
 mean(beg1_r2)
-# 0.7060412
+# 0.7170013
 
 beg1_var_un <- unlist(beg1_var)
 beg1_vardf <- as.data.frame(table(beg1_var_un))
@@ -53,12 +53,12 @@ beg1_vardf <- beg1_vardf[with(beg1_vardf, order(-Freq)), ]
 # xGF, ev_PTS, pp_PTS, pp_TOI, pp_A
 
 beg1_avg_pred <- list(0)
-for(i in 1:90){
+for(i in 1:190){
   beg1_avg_pred[i] <- (mean(unlist(lapply(beg1_pred, function(l) l[[i]]))))
 }
 beg1_avg_pred_u <- unlist(beg1_avg_pred)
 mean(abs(fullF_hit - beg1_avg_pred_u))
-# 1060441
+# 527185
 
 
 
@@ -67,14 +67,14 @@ beg2_r2 <- 0
 beg2_var <- list()
 beg2_pred <- list()
 for (i in 1:100){
-  beg2 <- rknnBeg(perf_F, perfF_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(perf_F))), stopat = 5)
+  beg2 <- rknnBeg(perf_F, perfF_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(perf_F))), stopat = 2)
   beg2_m <- knn.reg(train = perf_F[, bestset(beg2)], y = perfF_hit, k = 5)
   beg2_var[[i]] <- bestset(beg2)
   beg2_r2[i] <- beg2_m$R2Pred
   beg2_pred[[i]] <- beg2_m$pred
 }
 mean(beg2_r2)
-# 0.6843192
+# 0.7328054
 
 beg2_var_un <- unlist(beg2_var)
 beg2_vardf <- as.data.frame(table(beg2_var_un))
@@ -82,12 +82,12 @@ beg2_vardf <- beg2_vardf[with(beg2_vardf, order(-Freq)), ]
 # xGF, pp_TOI, ev_FF, ev_PTS, pp_PTS
 
 beg2_avg_pred <- list(0)
-for(i in 1:90){
+for(i in 1:190){
   beg2_avg_pred[i] <- (mean(unlist(lapply(beg2_pred, function(l) l[[i]]))))
 }
 beg2_avg_pred_u <- unlist(beg2_avg_pred)
 mean(abs(perfF_hit - beg2_avg_pred_u))
-# 1081154
+# 519262.5
 
 
 # Full D
@@ -95,7 +95,7 @@ beg3_r2 <- 0
 beg3_var <- list()
 beg3_pred <- list()
 for (i in 1:100){
-  beg3 <- rknnBeg(full_D, fullD_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(full_D))), stopat = 5)
+  beg3 <- rknnBeg(full_D, fullD_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(full_D))), stopat = 2)
   beg3_m <- knn.reg(train = full_D[, bestset(beg3)], y = fullD_hit, k = 5)
   beg3_var[[i]] <- bestset(beg3)
   beg3_r2[i] <- beg3_m$R2Pred
@@ -119,19 +119,21 @@ mean(abs(fullD_hit - beg3_avg_pred_u))
 
 
 
+
+
 # Perf D
 beg4_r2 <- 0
 beg4_var <- list()
 beg4_pred <- list()
 for (i in 1:100){
-beg4 <- rknnBeg(perf_D, perfD_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(perf_D))), stopat = 5)
+beg4 <- rknnBeg(perf_D, perfD_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(perf_D))), stopat = 2)
 beg4_m <- knn.reg(train = perf_D[, bestset(beg4)], y = perfD_hit, k = 5)
 beg4_var[[i]] <- bestset(beg4)
 beg4_r2[i] <- beg4_m$R2Pred
 beg4_pred[[i]] <- beg4_m$pred
 }
 mean(beg4_r2)
-# 0.5487841
+# 0.5386063
 
 beg4_var_un <- unlist(beg4_var)
 beg4_vardf <- as.data.frame(table(beg4_var_un))
@@ -144,7 +146,40 @@ for(i in 1:90){
   }
 beg4_avg_pred_u <- unlist(beg4_avg_pred)
 mean(abs(perfD_hit - beg4_avg_pred_u))
-# 711128.6
+# 691129.9
+
+
+# Plotting
+options(scipen=5)
+plot(beg4_avg_pred_u,perfD_hit, main='Perf Only Defense Model: Fitted vs Actual', xlab='Fitted Value ($)', ylab='Actual Value ($)')
+abline(0,1)
+
+options(scipen=5)
+plot(beg1_avg_pred_u,fullF_hit, main='Full Forward Model: Fitted vs Actual', xlab='Fitted Value ($)', ylab='Actual Value ($)')
+abline(0,1)
+
+options(scipen=5)
+plot(beg2_avg_pred_u,perfF_hit, main='Perf Only Forward Model: Fitted vs Actual', xlab='Fitted Value ($)', ylab='Actual Value ($)')
+abline(0,1)
+
+barplot(counts[10:1], main="Number of Times Variable Selected in rknn", horiz=TRUE,
+        names.arg=c('xGA','ev_SCA','ev_iSF','Ovrl','ev_iCF','ev_CF','ev_FF',"ev_iFF","ev_SCF","xGF"), xlab='Frequency')
+
+counts <- table(beg3_var_un)
+counts <- counts[order(-counts)]
+
+
+
+### Scaling test
+
+full_F_s <- full_F
+full_F_s$ly_salary <- scale(full_F_s$ly_salary)
+
+beg1_sc <- rknnBeg(full_F_s, fullF_hit, k = 5, r = 500, mtry = trunc(sqrt(ncol(full_F_s))), stopat = 2)
+beg1_m_sc <- knn.reg(train = full_F_s[, bestset(beg1_sc)], y = fullF_hit, k = 5)
+beg1_m_sc$R2Pred
+
+
 
 
 
