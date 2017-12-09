@@ -24,7 +24,7 @@ library(car)
 library(MASS)
 
 #-------------------------------------------READ IN DATA------------------------------------------------
-
+#first we need to read in the datasets and make sure the data has been read in properly
 #------------------Full Data Set
 #Defensive Players
 full_D <- read.csv('full_D.csv', header=T) #reading in the data
@@ -60,7 +60,7 @@ perfonly_D <- perfonly_D[, -c(1:3)]
 perfonly_F <- perfonly_F[, -c(1:3)] 
 
 #-------------------------------------------DATA EXPLORATION------------------------------------------------
-
+#We want to make sure we have correctly labeled the variables with their appropriate class
 #------------------Full Data Set
 #Need to idetify which are categorical variables and which are numeric
 lapply(full_D, class)
@@ -123,10 +123,13 @@ names(perfonly_F)
 
 #-------------------------------------------LINEAR MODELING------------------------------------------------
 #PRELIMINARY ANALYSIS
+#First, I am going to take a linear model of the full dataset so as to look at what we are dealing with
+#and identify if multicollinearity will be an issue
 lm0=lm(cap_hit~., data = full_D)
 summary(lm0) # HIGH r square but might largely due to multicollinearity
 vif(lm0) # severe multicollineary
 
+#We need to choose a variable selection method as 88 predictors is an incredibly large pool
 #-------------------------------------------ITERATIVE MODEL SELECTION------------------------------------------------
 #-----------------------------------------------Lasso Regression------------------------------------------------
 
@@ -142,8 +145,6 @@ class(sdata.m) <- "numeric"
 summary(sdata.m)
 
 ## Lasso regression uses the same function as ridge regression with alpha=1
-
-#fit_lasso = glmnet(df_mat[, -which(names(df) == 'cap_hit')], df_mat[, 2], alpha = 1)
 
 s.lasso <- glmnet(sdata.m[,-1], sdata.m[,1], alpha=1)
 s.lasso$lambda[20]
@@ -307,7 +308,14 @@ lasso_perfonly_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= 
 summary(lasso_perfonly_F)
 vif(lasso_perfonly_F)
 #Adjusted R-squared:  0.844
+
 #-----------------------------------------------End of Lasso Regression------------------------------------------------
+#So we have identified four models based on lasso regression and their corresponding variables.
+#This is an important step in building the best models as we now have eliminated multicollinearity
+#and can move forward with further analysis.
+
+#Also, based on residuals plots below, we can see that transformations may be necessary for some of
+#our data. Below are the transformations performed.
 #-----------------------------------------------Transformation of Variables------------------------------------------------
 
 #### Log Transformation of Variables ####
@@ -356,7 +364,12 @@ plot(df$xGF, lasso_full_D$residuals)
 #the adjusted r-squared has improved, but the residual plot has not
 #changing it is not worth the reduced interpretability
 
+#We have decided to not move forward with transformed variables as they do not provide
+#us with a better model. 
 #-----------------------------------------------ITERATIVE MODEL SELECTION------------------------------------------------
+#Now we will use an alternative method to lasso which is stepwise regression.
+#This will help identify the best variables based on the lowest AIC scores and then
+#we will continue to remove any multicollinearity that appears
 
 #----------------------------Full Defense Data Set
 ## Iterative model selection
@@ -592,10 +605,10 @@ summary(step_perfonlyf1)
 anova(step_fulld1, step_perfonlyd1)
 anova(step_fullf1, step_perfonlyf1)
 
-#---------------------------------------------Comparative Model Selection--------------------------------------------
-#The data frame full_Dnm I deleted because it didnt make sense
-#We can easily remove this seciton if we dont want to use it
+#We have identified several models that no longer have multicollinearity, now we
+#will perform comparative model selection to further analyze more models.
 
+#---------------------------------------------Comparative Model Selection--------------------------------------------
 
 #Using comparative model selection on the dataset with no multicollinearity
 bestmod <- regsubsets(cap_hit~., data=full_D, nbest=10)
@@ -617,7 +630,14 @@ best.sum[order(best.sum$adjr2,decreasing=T),]
 best.sum[order(best.sum$cp),]
 best.sum[order(best.sum$bic),]
 
+#This is interesting, all of the variables are similar to the ones chosen above between
+#either stepwise or lasso regression. Thus, creating further models based off comparative
+#model selection is unnecesarry.
+
 #---------------------------------------------K-Fold Cross Validation--------------------------------------------
+#Now that we have eight models to compare, lets cross validate to confirm our results
+#and make sure we are doing our best to not overfit the data
+
 #I am selecting K-fold Cross-Validation for its ease of use and will be 
 #using 5 as my k-fold value. To derive this value, I performed three different K-fold CV's using k = 3,
 #k=5, and k=10. For the purpose of this assignment, K=5 made the most sense both computationally and
@@ -673,6 +693,8 @@ mean(abs(error$cvpred - error$cap_hit))
 #on held out data (CV) than do the step models.
 
 #------------------------------------------Comparing Models Section 2----------------------------------------------
+#In this section, we are comparing all of our best models against one another to
+#chose exactly which ones we want to focus on in our conclusions.
 
 # compare models
 #Lasso models created and copied from above
@@ -753,7 +775,7 @@ summary(influence.measures(lasso_perfonly_F)) #no significant influential measur
 qqnorm(ti) #We see here that there may be an issue with our assumption of normality
 qqline(ti) #a linear model may not be the best fit to this data
 
-
+#-----------------------------------Final Linear Regression Results------------------------------
 #The chosen models for comparison are as follows (all p-values are significant at the 0.05 level)
 # Best full defense model: lasso_full_D
 #       Adjusted R-squared:  0.725
@@ -772,4 +794,11 @@ qqline(ti) #a linear model may not be the best fit to this data
 
 #*Most significant variables are the ones with lowest p-value, largest coefficient, and smallest
 #std error
+
+#In the scope of our project, the above findings are useful. It, at a high level (and discussed
+#much more in detail in our report), outlines that the linear regression models do not give us enough information
+#to confirm our hypothesis that player salary is not correlated with performance metrics.
+
+#For defense, our models are only slightly different but still very similar. For offense,
+#the models are identical. This does not prove our original hypothesis to be right, 
 
