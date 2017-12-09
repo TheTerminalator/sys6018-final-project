@@ -307,10 +307,56 @@ lasso_perfonly_F <- lm(cap_hit~ ev_PTS + ev_iFOW + pp_A + pp_PTS + stars, data= 
 summary(lasso_perfonly_F)
 vif(lasso_perfonly_F)
 #Adjusted R-squared:  0.844
-
 #-----------------------------------------------End of Lasso Regression------------------------------------------------
-#-----------------------------------------------ITERATIVE MODEL SELECTION------------------------------------------------
+#-----------------------------------------------Transformation of Variables------------------------------------------------
 
+#### Log Transformation of Variables ####
+#lets look at different transformations of variables to see if it can improve our models
+#-------------------------------------------------pp_A1
+
+#transform pp_A1 because of its inward fan
+df_trans = full_D
+df_trans$pp_A1 = sqrt(full_D$pp_A1)
+
+fit_trans = lm(cap_hit ~ ., data = df_trans)
+summary(fit_trans)
+
+#compare residuals
+plot(df_trans$pp_A1, fit_trans$residuals)
+plot(full_D$pp_A1, lasso_full_D$residuals)
+
+#the new residual plot does not look better, no point in keeping the transformation
+
+#--------------------------------------------------pk_A
+
+#transform pk_A because of its inward fan
+df_trans$pk_A = sqrt(full_D$pk_A)
+
+fit_trans = lm(cap_hit ~ ., data = df_trans)
+summary(fit_trans)
+
+#compare residuals
+plot(df_trans$pk_A, fit_trans$residuals)
+plot(full_D$pk_A, lasso_full_D$residuals)
+
+#the new residual plot doesn't look much better and the adjusted r-squared has not changed
+#so we will discard this transformation
+
+#------------------------------------------------xGF
+
+#transform xGF because of its outward fan
+df_trans$xGF = log(full_D$xGF)
+
+fit_trans = lm(cap_hit ~ ., data = df_trans)
+summary(fit_trans)
+
+plot(df_trans$xGF, fit_trans$residuals)
+plot(df$xGF, lasso_full_D$residuals)
+
+#the adjusted r-squared has improved, but the residual plot has not
+#changing it is not worth the reduced interpretability
+
+#-----------------------------------------------ITERATIVE MODEL SELECTION------------------------------------------------
 
 #----------------------------Full Defense Data Set
 ## Iterative model selection
@@ -546,44 +592,6 @@ summary(step_perfonlyf1)
 anova(step_fulld1, step_perfonlyd1)
 anova(step_fullf1, step_perfonlyf1)
 
-#RESIDUAL ANALYSIS
-#Plot residuals vs. fitted
-ti <- rstudent(step_fulld1)
-yhat <- fitted(step_fulld1)
-plot(yhat, ti) #small pattern but still distributed around 0
-abline(0,0)
-summary(influence.measures(step_fulld1)) #no significant influential measures
-qqnorm(ti) #looks good
-qqline(ti)
-
-#Plot residuals vs. fitted
-ti <- rstudent(step_fullf1)
-yhat <- fitted(step_fullf1)
-plot(yhat, ti) #small pattern but still distributed around 0
-abline(0,0)
-summary(influence.measures(step_fullf1)) #no significant influential measures
-qqnorm(ti) #significant fanning towards the tails
-qqline(ti)
-
-#Plot residuals vs. fitted
-ti <- rstudent(step_perfonlyd1)
-yhat <- fitted(step_perfonlyd1)
-plot(yhat, ti) #small pattern but still distributed around 0
-abline(0,0)
-summary(influence.measures(step_perfonlyd1)) #no significant influential measures
-qqnorm(ti) #significant fanning towards the tails
-qqline(ti)
-
-#Plot residuals vs. fitted
-ti <- rstudent(step_perfonlyf1)
-yhat <- fitted(step_perfonlyf1)
-plot(yhat, ti)
-abline(0,0) #small pattern but still distributed around 0
-summary(influence.measures(step_perfonlyf1)) #no significant influential measures
-qqnorm(ti) #significant fanning towards the tails
-qqline(ti)
-
-
 #---------------------------------------------Comparative Model Selection--------------------------------------------
 #The data frame full_Dnm I deleted because it didnt make sense
 #We can easily remove this seciton if we dont want to use it
@@ -707,6 +715,44 @@ summary(lasso_full_D)
 summary(lasso_perfonly_D)
 summary(lasso_full_F)
 summary(lasso_perfonly_F)
+
+#------------------------------------------RESIDUAL ANALYSIS
+#Plot residuals vs. fitted
+ti <- rstudent(lasso_full_D)
+yhat <- fitted(lasso_full_D)
+plot(yhat, ti) #small pattern but still distributed around 0
+abline(0,0)
+summary(influence.measures(lasso_full_D)) #no significant influential measures
+qqnorm(ti) #We see here that there may be an issue with our assumption of normality
+qqline(ti) #a linear model may not be the best fit to this data
+
+#Plot residuals vs. fitted
+ti <- rstudent(lasso_perfonly_D)
+yhat <- fitted(lasso_perfonly_D)
+plot(yhat, ti) #small pattern but still distributed around 0, similar to above model
+abline(0,0)
+summary(influence.measures(lasso_perfonly_D)) #no significant influential measures
+qqnorm(ti) #We see here that there may be an issue with our assumption of normality
+qqline(ti) #a linear model may not be the best fit to this data
+
+#Plot residuals vs. fitted
+ti <- rstudent(lasso_full_F)
+yhat <- fitted(lasso_full_F)
+plot(yhat, ti) #small pattern but still distributed around 0, similar pattern
+abline(0,0)
+summary(influence.measures(lasso_full_F)) #no significant influential measures
+qqnorm(ti) #We see here that there may be an issue with our assumption of normality
+qqline(ti) #a linear model may not be the best fit to this data
+
+#Plot residuals vs. fitted
+ti <- rstudent(lasso_perfonly_F)
+yhat <- fitted(lasso_perfonly_F)
+plot(yhat, ti)
+abline(0,0) #small pattern but still distributed around 0
+summary(influence.measures(lasso_perfonly_F)) #no significant influential measures
+qqnorm(ti) #We see here that there may be an issue with our assumption of normality
+qqline(ti) #a linear model may not be the best fit to this data
+
 
 #The chosen models for comparison are as follows (all p-values are significant at the 0.05 level)
 # Best full defense model: lasso_full_D
