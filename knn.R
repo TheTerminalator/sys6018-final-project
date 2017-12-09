@@ -4,10 +4,12 @@
 library(tidyverse)
 # library(FNN)
 library(rknn)
+library(DMwR)
+library(caret)
 
-
-df <- read_csv('fa_clean_F.csv')
-sum(is.na(df))
+oldw <- getOption("warn") #0
+options(warn = -1)
+# options(warn = oldw)
 
 full_D <- read_csv('full_D.csv')
 full_F <- read_csv('full_F.csv')
@@ -15,17 +17,205 @@ full_F <- read_csv('full_F.csv')
 perf_D <- read_csv('perfonly_D.csv')
 perf_F <- read_csv('perfonly_F.csv')
 
-full_D$X1 <- NULL
-full_F$X1 <- NULL
-perf_D$X1 <- NULL
-perf_F$X1 <- NULL
+drops <- c('X1','name','Nat')
+perf_F <- perf_F[ , !(names(perf_F) %in% drops)]
+perf_D <- perf_D[ , !(names(perf_D) %in% drops)]
+full_D <- full_D[ , !(names(full_D) %in% drops)]
+full_F <- full_F[ , !(names(full_F) %in% drops)]
 
-varUsed ###### !!!!!!!!!
 
-## Do k-fold cross validation to get fitted for all players? even manually
-## Need to extract vars for best model
+# Full F ######
 
-######## FULL D ######
+#5 fold cv
+fold1 <- 1:38
+fold2 <- 39:76
+fold3 <- 77:114
+fold4 <- 115:152
+fold5 <- 153:190
+full_F_MSE <- 0
+
+fullF_hit <- full_F$cap_hit
+full_F <- full_F[,-2]
+
+full_F_train1 <- full_F[-fold1,]
+full_F_test1 <- full_F[fold1,]
+rknn1 <- rknnReg(full_F_train1,full_F_test1,y=fullF_hit[-fold1],k=5,r=500,mtry=5)
+full_F_MSE[1] <- (rknn1$pred - fullF_hit[fold1])^2
+
+full_F_train2 <- full_F[-fold2,]
+full_F_test2 <- full_F[fold2,]
+rknn2 <- rknnReg(full_F_train2,full_F_test2,y=fullF_hit[-fold2],k=5,r=500,mtry=5)
+full_F_MSE[2] <- (rknn2$pred - fullF_hit[fold2])^2
+
+full_F_train3 <- full_F[-fold3,]
+full_F_test3 <- full_F[fold3,]
+rknn3 <- rknnReg(full_F_train3,full_F_test3,y=fullF_hit[-fold3],k=5,r=500,mtry=5)
+full_F_MSE[3] <- (rknn3$pred - fullF_hit[fold3])^2
+
+full_F_train4 <- full_F[-fold4,]
+full_F_test4 <- full_F[fold4,]
+rknn4 <- rknnReg(full_F_train4,full_F_test4,y=fullF_hit[-fold4],k=5,r=500,mtry=5)
+full_F_MSE[4] <- (rknn4$pred - fullF_hit[fold4])^2
+
+full_F_train5 <- full_F[-fold5,]
+full_F_test5 <- full_F[fold5,]
+rknn5 <- rknnReg(full_F_train5,full_F_test5,y=fullF_hit[-fold5],k=5,r=500,mtry=5)
+full_F_MSE[5] <- (rknn5$pred - fullF_hit[fold5])^2
+
+full_F_MSE <- mean(full_F_MSE)
+full_F_RMSE <- sqrt(full_F_MSE)
+
+fitted <- c(rknn1$pred,rknn2$pred,rknn3$pred,rknn4$pred,rknn5$pred)
+full_F_MAE <- mean(abs(fullF_hit - fitted))
+# 722690.2
+
+
+# Perf F #####
+
+fold1 <- 1:38
+fold2 <- 39:76
+fold3 <- 77:114
+fold4 <- 115:152
+fold5 <- 153:190
+perf_F_MSE <- 0
+
+perfF_hit <- perf_F$cap_hit
+perf_F <- perf_F[,-2]
+
+perf_F_train1 <- perf_F[-fold1,]
+perf_F_test1 <- perf_F[fold1,]
+rknn1 <- rknnReg(perf_F_train1,perf_F_test1,y=perfF_hit[-fold1],k=5,r=500,mtry=5)
+perf_F_MSE[1] <- (rknn1$pred - perfF_hit[fold1])^2
+
+perf_F_train2 <- perf_F[-fold2,]
+perf_F_test2 <- perf_F[fold2,]
+rknn2 <- rknnReg(perf_F_train2,perf_F_test2,y=perfF_hit[-fold2],k=5,r=500,mtry=5)
+perf_F_MSE[2] <- (rknn2$pred - perfF_hit[fold2])^2
+
+perf_F_train3 <- perf_F[-fold3,]
+perf_F_test3 <- perf_F[fold3,]
+rknn3 <- rknnReg(perf_F_train3,perf_F_test3,y=perfF_hit[-fold3],k=5,r=500,mtry=5)
+perf_F_MSE[3] <- (rknn3$pred - perfF_hit[fold3])^2
+
+perf_F_train4 <- perf_F[-fold4,]
+perf_F_test4 <- perf_F[fold4,]
+rknn4 <- rknnReg(perf_F_train4,perf_F_test4,y=perfF_hit[-fold4],k=5,r=500,mtry=5)
+perf_F_MSE[4] <- (rknn4$pred - perfF_hit[fold4])^2
+
+perf_F_train5 <- perf_F[-fold5,]
+perf_F_test5 <- perf_F[fold5,]
+rknn5 <- rknnReg(perf_F_train5,perf_F_test5,y=perfF_hit[-fold5],k=5,r=500,mtry=5)
+perf_F_MSE[5] <- (rknn5$pred - perfF_hit[fold5])^2
+
+perf_F_MSE <- mean(perf_F_MSE)
+perf_F_RMSE <- sqrt(perf_F_MSE)
+
+fitted <- c(rknn1$pred,rknn2$pred,rknn3$pred,rknn4$pred,rknn5$pred)
+perf_F_MAE <- mean(abs(perfF_hit - fitted))
+# 720,952.1
+
+
+# Full D #####
+
+fold1 <- 1:18
+fold2 <- 18:35
+fold3 <- 36:53
+fold4 <- 54:71
+fold5 <- 72:90
+full_D_MSE <- 0
+
+fullD_hit <- full_D$cap_hit
+full_D <- full_D[,-2]
+
+full_D_train1 <- full_D[-fold1,]
+full_D_test1 <- full_D[fold1,]
+rknn1 <- rknnReg(full_D_train1,full_D_test1,y=fullD_hit[-fold1],k=5,r=500,mtry=5)
+full_D_MSE[1] <- (rknn1$pred - fullD_hit[fold1])^2
+
+full_D_train2 <- full_D[-fold2,]
+full_D_test2 <- full_D[fold2,]
+rknn2 <- rknnReg(full_D_train2,full_D_test2,y=fullD_hit[-fold2],k=5,r=500,mtry=5)
+full_D_MSE[2] <- (rknn2$pred - fullD_hit[fold2])^2
+
+full_D_train3 <- full_D[-fold3,]
+full_D_test3 <- full_D[fold3,]
+rknn3 <- rknnReg(full_D_train3,full_D_test3,y=fullD_hit[-fold3],k=5,r=500,mtry=5)
+full_D_MSE[3] <- (rknn3$pred - fullD_hit[fold3])^2
+
+full_D_train4 <- full_D[-fold4,]
+full_D_test4 <- full_D[fold4,]
+rknn4 <- rknnReg(full_D_train4,full_D_test4,y=fullD_hit[-fold4],k=5,r=500,mtry=5)
+full_D_MSE[4] <- (rknn4$pred - fullD_hit[fold4])^2
+
+full_D_train5 <- full_D[-fold5,]
+full_D_test5 <- full_D[fold5,]
+rknn5 <- rknnReg(full_D_train5,full_D_test5,y=fullD_hit[-fold5],k=5,r=500,mtry=5)
+full_D_MSE[5] <- (rknn5$pred - fullD_hit[fold5])^2
+
+full_D_MSE <- mean(full_D_MSE)
+full_D_RMSE <- sqrt(full_D_MSE)
+
+fitted <- c(rknn1$pred,rknn2$pred,rknn3$pred,rknn4$pred,rknn5$pred)
+full_D_MAE <- mean(abs(fullD_hit - fitted))
+# 1,359,519
+
+
+# Perf D ######
+
+fold1 <- 1:18
+fold2 <- 18:35
+fold3 <- 36:53
+fold4 <- 54:71
+fold5 <- 72:90
+perf_D_MSE <- 0
+
+perfD_hit <- perf_D$cap_hit
+perf_D <- perf_D[,-2]
+
+perf_D_train1 <- perf_D[-fold1,]
+perf_D_test1 <- perf_D[fold1,]
+rknn1 <- rknnReg(perf_D_train1,perf_D_test1,y=perfD_hit[-fold1],k=5,r=500,mtry=5)
+perf_D_MSE[1] <- (rknn1$pred - perfD_hit[fold1])^2
+
+perf_D_train2 <- perf_D[-fold2,]
+perf_D_test2 <- perf_D[fold2,]
+rknn2 <- rknnReg(perf_D_train2,perf_D_test2,y=perfD_hit[-fold2],k=5,r=500,mtry=5)
+perf_D_MSE[2] <- (rknn2$pred - perfD_hit[fold2])^2
+
+perf_D_train3 <- perf_D[-fold3,]
+perf_D_test3 <- perf_D[fold3,]
+rknn3 <- rknnReg(perf_D_train3,perf_D_test3,y=perfD_hit[-fold3],k=5,r=500,mtry=5)
+perf_D_MSE[3] <- (rknn3$pred - perfD_hit[fold3])^2
+
+perf_D_train4 <- perf_D[-fold4,]
+perf_D_test4 <- perf_D[fold4,]
+rknn4 <- rknnReg(perf_D_train4,perf_D_test4,y=perfD_hit[-fold4],k=5,r=500,mtry=5)
+perf_D_MSE[4] <- (rknn4$pred - perfD_hit[fold4])^2
+
+perf_D_train5 <- perf_D[-fold5,]
+perf_D_test5 <- perf_D[fold5,]
+rknn5 <- rknnReg(perf_D_train5,perf_D_test5,y=perfD_hit[-fold5],k=5,r=500,mtry=5)
+perf_D_MSE[5] <- (rknn5$pred - perfD_hit[fold5])^2
+
+perf_D_MSE <- mean(perf_D_MSE)
+perf_D_RMSE <- sqrt(perf_D_MSE)
+
+fitted <- c(rknn1$pred,rknn2$pred,rknn3$pred,rknn4$pred,rknn5$pred)
+perf_D_MAE <- mean(abs(perfD_hit - fitted))
+# 1363830
+
+
+
+
+
+
+
+########## Trials ##########
+
+# LOOCV
+
+
+######## FULL D 
 
 sub <- sample(1:nrow(full_D), size = .8*nrow(full_D))
 tr.full_D <- full_D[sub,]
@@ -69,7 +259,7 @@ sum(abs(rknn$pred - te.full_D_hit))/18
 ######### IS THIS RIGHT??
 #rknn with normalization
 rknn_norm_full_D <- rknnReg(norm.tr.full_D, norm.te.full_D, y=norm.tr.full_D_hit, k=5, r=100, mtry=trunc(sqrt(ncol(norm.tr.full_D))))
-sum(abs(rknn_norm_full_D$pred - norm.te.full_D_hit))/18
+sum(abs(rknn_norm_full_D$pred - norm.te.full_D_hit))
 # 0.143155
 mean(te.full_D_hit) * sum(abs(rknn_norm_full_D$pred - norm.te.full_D_hit))/18
 # 292849
@@ -83,8 +273,6 @@ mean(te.full_D_hit) * sum(abs(rknn_norm_full_D$pred - norm.te.full_D_hit))/18
 # rknnb_mod <- knn.reg(train = te.full_D[, bestset(rknnb)], y = tr.full_D_hit, k = 3)
 # sum(abs(rknnb_mod$pred - te.full_D_hit))/18
 # # 1390218
-
-# rfe in caret
 
 
 # with FNN
@@ -100,7 +288,7 @@ mean(te.full_D_hit) * sum(abs(rknn_norm_full_D$pred - norm.te.full_D_hit))/18
 # # 1406545
 
 
-######## FULL F ######
+######## FULL F
 
 sub <- sample(1:nrow(full_F), size = .8*nrow(full_F))
 tr.full_F <- full_F[sub,]
@@ -138,7 +326,7 @@ mean(te.full_F_hit) * sum(abs(rknn_norm_full_F$pred - norm.te.full_F_hit))/18
 
 
 
-####### PERF D ######
+####### PERF D #
 
 sub <- sample(1:nrow(perf_D), size = .8*nrow(perf_D))
 tr.perf_D <- perf_D[sub,]
@@ -185,7 +373,7 @@ mean(te.perf_D_hit) * sum(abs(rknn_norm_perf_D$pred - norm.te.perf_D_hit))/18
 
 
 
-###### PERF F ######
+###### PERF F #
 
 sub <- sample(1:nrow(perf_F), size = .8*nrow(perf_F))
 tr.perf_F <- perf_F[sub,]
@@ -226,9 +414,25 @@ sum(is.na(norm.te.perf_F))
 rknn_norm_perf_F <- rknnReg(norm.tr.perf_F, norm.te.perf_F, y=norm.tr.perf_F_hit, k=5, r=100, mtry=trunc(sqrt(ncol(norm.tr.perf_F))))
 sum(abs(rknn_norm_perf_F$pred - norm.te.perf_F_hit))/18
 # 0.1214152
-mean(te.perf_F_hit) * sum(abs(rknn_norm_perf_F$pred - norm.te.perf_F_hit))/18
+(max(te.perf_F_hit)-min(te.perf_F_hit)) * sum(abs(rknn_norm_perf_F$pred - norm.te.perf_F_hit))/18
 # 283541.4
 
+# sc.tr.perf_F <- scale()
+sc.hit <- scale(tr.perf_F_hit)
+rknn_scale<- rknnReg(scale(tr.perf_F), scale(te.perf_F), y=sc.hit, 
+                            k=5, r=100, mtry=trunc(sqrt(ncol(te.perf_F))))
+pred <- rknn_scale$pred
+sc.hit
+
+sc <- scale(te.perf_F_hit)
+fit <- unscale(pred,sc.hit)
+
+sum(abs(te.perf_F_hit - fit))
+
+
+
+?unscale
+?scale
 print(rknn_norm_perf_F)
 mat <-varUsed(rknn_norm_perf_F,by.KNN=TRUE)
 # perf_F_fitted <- fitted(rknn_norm_perf_F)
